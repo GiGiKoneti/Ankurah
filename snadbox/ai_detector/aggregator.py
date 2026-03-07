@@ -2,7 +2,8 @@
 aggregator.py — Maintains a rolling 30-second window of layer scan snapshots
 and computes a weighted ensemble score with compound bonuses and evasion penalties.
 
-The output dict is the formal contract with the parent ensemble system.
+Evasion penalty uses only the last 10 snapshots (not the full 60-window).
+Peripheral is now included in WEIGHTS.
 """
 
 import collections
@@ -18,7 +19,7 @@ from capability import caps
 SESSION_ID: str = str(uuid.uuid4())
 
 # ─── Rolling window (thread-safe) ────────────────────────────────────────────
-# One deque entry = one full pass of all 5 layers.
+# One deque entry = one full pass of all layers.
 # 60 entries × 0.5s fast tick ≈ 30 seconds of history.
 _snapshot_window: collections.deque = collections.deque(maxlen=60)
 _window_lock      = threading.Lock()
@@ -49,9 +50,9 @@ def compute_score() -> Dict[str, Any]:
         n = len(snapshots)
 
         # Accumulate per-layer sum of scores
-        layer_sums:  Dict[str, float] = {k: 0.0 for k in WEIGHTS}
-        layer_counts: Dict[str, int]  = {k: 0   for k in WEIGHTS}
-        all_evidence: List[str]       = []
+        layer_sums:   Dict[str, float] = {k: 0.0 for k in WEIGHTS}
+        layer_counts: Dict[str, int]   = {k: 0   for k in WEIGHTS}
+        all_evidence: List[str]        = []
 
         for snap in snapshots:
             for layer_name in WEIGHTS:
@@ -85,19 +86,34 @@ def compute_score() -> Dict[str, Any]:
         elif layers_firing >= 3:
             weighted_sum *= 1.3
 
-        # Step 4 — Evasion penalty
+        # Step 4 — Evasion penalty (ONLY last 10 snapshots — not full 60-window)
         evasion_flags: List[str] = []
         try:
-            from layers.network import get_evasion_flags
-            evasion_flags = get_evasion_flags()
+            recent_snapshots = list(_snapshot_window)[-10:]
+            unique_recent_flags: set = set()
+            for snap in recent_snapshots:
+                for layer_name, result in snap["layers"].items():
+                    raw_data = result.get("raw", {})
+                    for flag in raw_data.get("evasion_flags", []):
+                        unique_recent_flags.add(flag)
+            evasion_flags = list(unique_recent_flags)
             if evasion_flags:
-                evasion_bonus = min(len(evasion_flags) * 7, 15)
+                evasion_bonus = min(len(unique_recent_flags) * 7, 15)
                 weighted_sum += evasion_bonus
         except Exception as e:
             print(f"[AGGREGATOR] evasion flag fetch error: {e}")
 
+        # Also pull from network layer directly
+        try:
+            from layers.network import get_evasion_flags
+            net_flags = get_evasion_flags()
+            for f in net_flags:
+                if f not in evasion_flags:
+                    evasion_flags.append(f)
+        except Exception as e:
+            print(f"[AGGREGATOR] network evasion flag fetch error: {e}")
+
         # Step 5 — Confidence adjustment
-        # Base confidence: average of per-layer confidences from latest snapshot
         base_confidence = 1.0
         if snapshots:
             latest = snapshots[-1]
@@ -113,37 +129,36 @@ def compute_score() -> Dict[str, Any]:
             base_confidence *= 0.85
 
         # Step 6 — Clamp
-        final_score  = max(0.0, min(100.0, weighted_sum))
-        confidence   = max(0.0, min(1.0, base_confidence))
-        ready        = n >= 10
+        final_score = max(0.0, min(100.0, weighted_sum))
+        confidence  = max(0.0, min(1.0, base_confidence))
+        ready       = n >= 10
 
         return {
-            "timestamp":        time.time(),
-            "session_id":       SESSION_ID,
-            "hardware_ai_score": round(final_score, 2),
-            "confidence":       round(confidence, 3),
-            "capability_mode":  "admin" if caps.is_admin else "user",
-            "os":               caps.os_name,
-            "layer_breakdown":  {k: round(layer_avgs[k], 2) for k in WEIGHTS},
-            "layers_firing":    layers_firing,
-            "evasion_flags":    evasion_flags,
-            "evidence":         all_evidence[:50],   # cap at 50 to keep JSON readable
-            "ready_for_ensemble": ready,
+            "timestamp":           time.time(),
+            "session_id":          SESSION_ID,
+            "hardware_ai_score":   round(final_score, 2),
+            "confidence":          round(confidence, 3),
+            "capability_mode":     "admin" if caps.is_admin else "user",
+            "os":                  caps.os_name,
+            "layer_breakdown":     {k: round(layer_avgs[k], 2) for k in WEIGHTS},
+            "layers_firing":       layers_firing,
+            "evasion_flags":       evasion_flags,
+            "evidence":            all_evidence[:50],
+            "ready_for_ensemble":  ready,
         }
 
     except Exception as e:
         print(f"[AGGREGATOR] compute_score error: {e}")
-        # Return a safe default that won't crash the ensemble consumer
         return {
-            "timestamp":          time.time(),
-            "session_id":         SESSION_ID,
-            "hardware_ai_score":  0.0,
-            "confidence":         0.0,
-            "capability_mode":    "user",
-            "os":                 caps.os_name,
-            "layer_breakdown":    {k: 0.0 for k in WEIGHTS},
-            "layers_firing":      0,
-            "evasion_flags":      [],
-            "evidence":           [],
-            "ready_for_ensemble": False,
+            "timestamp":           time.time(),
+            "session_id":          SESSION_ID,
+            "hardware_ai_score":   0.0,
+            "confidence":          0.0,
+            "capability_mode":     "user",
+            "os":                  caps.os_name,
+            "layer_breakdown":     {k: 0.0 for k in WEIGHTS},
+            "layers_firing":       0,
+            "evasion_flags":       [],
+            "evidence":            [],
+            "ready_for_ensemble":  False,
         }

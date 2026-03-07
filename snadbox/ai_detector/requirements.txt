@@ -1,8 +1,24 @@
+# ─── Core ─────────────────────────────────────────────────────────────────────
 psutil>=5.9.0
-pynvml>=11.0.0
-pyperclip>=1.8.0
-websockets>=11.0.0
-watchdog>=3.0.0
-wmi>=1.5.1; sys_platform == "win32"
 fastapi>=0.110.0
+pydantic>=2.0
 uvicorn[standard]>=0.29.0
+
+# ─── GPU / Hardware ────────────────────────────────────────────────────────────
+pynvml>=11.0.0
+
+# ─── Clipboard / Keyboard ─────────────────────────────────────────────────────
+pyperclip>=1.8.0
+pynput>=1.7.6
+
+# ─── Model file watcher ───────────────────────────────────────────────────────
+watchdog>=3.0.0
+
+# ─── WebSocket client (for testing) ───────────────────────────────────────────
+websockets>=11.0.0
+
+# ─── Optional: screen capture for screen color analysis ───────────────────────
+# Pillow>=10.0.0
+
+# ─── Windows only ─────────────────────────────────────────────────────────────
+wmi>=1.5.1; sys_platform == "win32"

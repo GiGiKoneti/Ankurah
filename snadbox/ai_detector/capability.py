@@ -3,6 +3,9 @@ capability.py — Detects what hardware, OS, and system features are available.
 
 Runs once at startup and exports a singleton `caps` instance.
 All detection layer modules import `caps` from this module.
+
+Also exports _is_internal_service() — a guard that prevents Varchas from
+flagging its own TruthLens siblings (GiGi on :8001, Surakshan on :8003).
 """
 
 import os
@@ -11,17 +14,63 @@ import subprocess
 import platform
 
 
+# ─── Self-Exclusion Guard ─────────────────────────────────────────────────────
+
+def _is_internal_service(proc) -> bool:
+    """Return True if `proc` is a TruthLens internal service (GiGi or Surakshan).
+
+    Checks (in order):
+      1. proc.environ() — looks for TRUTHLENS_SERVICE env key
+      2. proc.cmdline() — looks for known internal script file names
+
+    Returns False on any exception (safe default = do not skip).
+    """
+    from config import TRUTHLENS_ENV_KEY, INTERNAL_SERVICES
+
+    try:
+        # Method 1: environment variable check
+        try:
+            env = proc.environ()
+            svc = env.get(TRUTHLENS_ENV_KEY, "").lower()
+            if svc and svc in INTERNAL_SERVICES:
+                return True
+        except Exception:
+            pass  # AccessDenied, ZombieProcess, etc. — fall through to cmdline
+
+        # Method 2: cmdline heuristic (script name contains service name)
+        try:
+            cmdline = " ".join(proc.cmdline() or []).lower()
+            for svc_name in INTERNAL_SERVICES:
+                # Match service name appearing as a path component or script name
+                if f"/{svc_name}" in cmdline or f"\\{svc_name}" in cmdline:
+                    return True
+                # Match if running main.py and env key leaked via cmdline
+                if svc_name in cmdline and ("main.py" in cmdline or "uvicorn" in cmdline):
+                    # Extra check: port-based exclusion
+                    from config import INTERNAL_PORTS
+                    for port in INTERNAL_PORTS:
+                        if str(port) in cmdline:
+                            return True
+        except Exception:
+            pass
+
+    except Exception:
+        pass
+
+    return False
+
+
 class Capabilities:
     """Probes system capabilities at startup; sets boolean flags for every layer."""
 
     def __init__(self):
         """Detect OS, privileges, GPU, clipboard, window API, and network access."""
-        self.os_name           = self._detect_os()
-        self.is_admin          = self._detect_admin()
-        self.has_nvidia        = self._detect_nvidia()
-        self.has_amd           = self._detect_amd()
-        self.has_clipboard     = self._detect_clipboard()
-        self.has_window_api    = self._detect_window_api()
+        self.os_name              = self._detect_os()
+        self.is_admin             = self._detect_admin()
+        self.has_nvidia           = self._detect_nvidia()
+        self.has_amd              = self._detect_amd()
+        self.has_clipboard        = self._detect_clipboard()
+        self.has_window_api       = self._detect_window_api()
         self.can_read_connections = self._detect_connections()
         self._print_report()
 
@@ -84,8 +133,7 @@ class Capabilities:
                     vendor_path = os.path.join(drm_path, entry, "device", "vendor")
                     if os.path.isfile(vendor_path):
                         with open(vendor_path) as f:
-                            # AMD vendor ID is 0x1002
-                            if "1002" in f.read():
+                            if "1002" in f.read():  # AMD vendor ID = 0x1002
                                 return True
                 return False
             elif self.os_name == "Darwin":
@@ -118,7 +166,6 @@ class Capabilities:
         try:
             if self.os_name == "Windows":
                 import ctypes
-                # Verify windll.user32 is accessible
                 _ = ctypes.windll.user32.GetForegroundWindow
                 return True
             elif self.os_name == "Linux":
@@ -128,7 +175,6 @@ class Capabilities:
                 )
                 if result.returncode == 0:
                     return True
-                # Fallback: try wmctrl
                 result2 = subprocess.run(
                     ["which", "wmctrl"],
                     capture_output=True, text=True, timeout=3
@@ -168,7 +214,7 @@ class Capabilities:
             return "✅" if flag else "⚠️ "
 
         print("\n╔══════════════════════════════════════════╗")
-        print("║        AI DETECTOR — CAPABILITY REPORT   ║")
+        print("║       VARCHAS — CAPABILITY REPORT        ║")
         print("╚══════════════════════════════════════════╝")
         print(f"  OS                : {self.os_name}")
         print(f"  {sym(self.is_admin)} Admin/Root")
