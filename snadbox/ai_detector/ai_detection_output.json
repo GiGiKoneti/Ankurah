@@ -1,0 +1,35 @@
+{
+  "timestamp": 1772818469.243791,
+  "session_id": "ec5ecbce-5b85-4f6e-91fe-b5f9cb45e9e8",
+  "hardware_ai_score": 72.88,
+  "confidence": 0.739,
+  "capability_mode": "user",
+  "os": "Linux",
+  "layer_breakdown": {
+    "browser": 6.25,
+    "network": 10.0,
+    "process": 3.07,
+    "behavioral": 0.0,
+    "hardware": 6.1
+  },
+  "layers_firing": 3,
+  "evasion_flags": [],
+  "evidence": [
+    "Connection to AI domain generativelanguage.googleapis.com (IP 2001:4860:4802:32::223)",
+    "Long-held AI connection to 2001:4860:4802:32::223 (open 22.4s \u2014 inference pattern)",
+    "Long-held AI connection to 2001:4860:4802:34::223 (open 184.5s \u2014 inference pattern)",
+    "Long-held AI connection to 2001:4860:4802:34::223 (open 184.5s \u2014 inference pattern)",
+    "Long-held AI connection to 2001:4860:4802:34::223 (open 17.6s \u2014 inference pattern)",
+    "Long-held AI connection to 2001:4860:4802:36::223 (open 184.5s \u2014 inference pattern)",
+    "Long-held AI connection to 2001:4860:4802:38::223 (open 22.4s \u2014 inference pattern)",
+    "Long-held AI connection to 2001:4860:4802:38::223 (open 184.5s \u2014 inference pattern)",
+    "Long-held AI connection to 2001:4860:4802:34::223 (open 184.5s \u2014 inference pattern)",
+    "Long-held AI connection to 2001:4860:4802:36::223 (open 20.8s \u2014 inference pattern)",
+    "RAM spike: 'chrome' using 500 MB",
+    "RAM spike: 'electron' using 567 MB",
+    "LLM-scale RAM loaded: 6.5 GB",
+    "RAM spike: 'chrome' (PID 2283) using 500 MB",
+    "RAM spike: 'electron' (PID 3923) using 567 MB"
+  ],
+  "ready_for_ensemble": true
+}
