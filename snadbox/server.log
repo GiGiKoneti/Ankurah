@@ -1,0 +1,26 @@
+INFO:     Started server process [204892]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+✅ Agent configured -> agent_ready.py (URL: http://172.25.72.180:8000)
+
+╔══════════════════════════════════════════════════╗
+║        TRUTHLENS SERVER READY                    ║
+╠══════════════════════════════════════════════════╣
+║  Local IP:   172.25.72.180                       ║
+║  Port:       8000                                ║
+║  Health:     http://172.25.72.180:8000/health          ║
+╠══════════════════════════════════════════════════╣
+║  ✅ Packages installed                           ║
+║  ✅ Agent configured → agent_ready.py            ║
+║  ✅ Firewall opened                              ║
+╠══════════════════════════════════════════════════╣
+║  SEND agent_ready.py TO FRIEND                   ║
+║  They just run: python agent_ready.py            ║
+╠══════════════════════════════════════════════════╣
+║  Waiting for connections...                      ║
+╚══════════════════════════════════════════════════╝
+
+INFO:     172.25.72.180:43578 - "POST /heartbeat HTTP/1.1" 200 OK
+INFO:     172.25.72.180:38570 - "POST /heartbeat HTTP/1.1" 200 OK
+INFO:     172.25.72.180:34262 - "POST /heartbeat HTTP/1.1" 200 OK
