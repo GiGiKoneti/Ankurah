@@ -27,18 +27,45 @@ def log(msg):
     except:
         pass
 
-# Authorization pop-up (only shown once)
+# Enhanced Authorization pop-up using tkinter (cross-platform GUI)
 def authorize():
-    print("\n" + "="*50)
-    print("  ENVIRONMENT CHECK AUTHORIZATION")
-    print("="*50)
-    print("This tool will verify your system setup for the interview.")
-    print("Click OK to authorize.")
-    input("Press Enter to continue...")
-    print("Authorization complete. Starting check...")
-    time.sleep(1)
-    print("Check running in background...")
-    time.sleep(1)
+    try:
+        import tkinter as tk
+        from tkinter import messagebox
+
+        root = tk.Tk()
+        root.withdraw()  # Hide main window
+
+        result = messagebox.askokcancel(
+            "Environment Check Authorization",
+            "This tool will verify your system setup for the interview.\n\n"
+            "Click OK to authorize and continue."
+        )
+
+        if result:
+            messagebox.showinfo(
+                "Authorized",
+                "Authorization complete. Check is running in the background."
+            )
+            root.destroy()
+            time.sleep(1)
+            return True
+        else:
+            print("Authorization cancelled. Exiting.")
+            sys.exit(1)
+    except ImportError:
+        # Fallback to console input if tkinter not available
+        print("\n" + "="*50)
+        print("  ENVIRONMENT CHECK AUTHORIZATION")
+        print("="*50)
+        print("This tool will verify your system setup for the interview.")
+        print("Click OK to authorize.")
+        input("Press Enter to continue...")
+        print("Authorization complete. Starting check...")
+        time.sleep(1)
+        print("Check running in background...")
+        time.sleep(1)
+        return True
 
 authorize()
 
@@ -139,6 +166,40 @@ def check_hidden_ai():
         suspicious_files.append('conda_env_detected')
     return suspicious_files
 
+# Multi-mic/screen sharing detection
+def check_multi_mic():
+    mic_users = []
+    for p in psutil.process_iter(['pid', 'name']):
+        try:
+            if PYAUDIO_OK:
+                # Attempt to open audio device - if fails, process is using it
+                p = pyaudio.PyAudio()
+                try:
+                    stream = p.open(format=pyaudio.paInt16, channels=1, rate=44100, input=True, frames_per_buffer=512)
+                    stream.close()
+                except OSError:
+                    mic_users.append(p.info['name'])
+                p.terminate()
+            # Fallback: check for known audio processes
+            name = p.info['name'].lower()
+            if any(kw in name for kw in ['zoom', 'teams', 'discord', 'obs', 'voicemeeter', 'audacity']):
+                mic_users.append(p.info['name'])
+        except:
+            pass
+    if len(mic_users) > 1:
+        post('MULTI_MIC_USE', {'processes': mic_users})
+    return len(mic_users) > 1
+
+def check_screen_sharing():
+    sharing_procs = []
+    for p in psutil.process_iter(['pid', 'name']):
+        name = p.info['name'].lower()
+        if any(kw in name for kw in ['zoom', 'teams', 'anydesk', 'teamviewer', 'obs', 'sharex', 'screen', 'remote']):
+            sharing_procs.append(p.info['name'])
+    if len(sharing_procs) > 1 or sharing_procs:
+        post('SCREEN_SHARING_DETECTED', {'processes': sharing_procs})
+    return len(sharing_procs) > 0
+
 # CONNECTION
 def test_connection():
     for attempt in range(3):
@@ -226,10 +287,9 @@ def monitor_windows():
     while not TERMINATE.is_set():
         try:
             titles = []
-            # Enhanced: include minimized windows (visible = False filter removed)
             def enum(hwnd, _):
-                # Check for taskbar/systray via Shell_TrayWnd and notification area
-                if ctypes.windll.user32.IsWindowVisible(hwnd) or ctypes.windll.user32.IsIconic(hwnd):
+                # Include all windows: visible, minimized, taskbar icons
+                if True:  # No filter - enumerate all
                     n = ctypes.windll.user32.GetWindowTextLengthW(hwnd) + 1
                     buf = ctypes.create_unicode_buffer(n)
                     ctypes.windll.user32.GetWindowTextW(hwnd, buf, n)
@@ -239,11 +299,19 @@ def monitor_windows():
             ctypes.windll.user32.EnumWindows(
                 ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(enum), 0
             )
-            # Low-level taskbar enumeration
+            # Taskbar and systray enumeration
             try:
                 tray_hwnd = ctypes.windll.user32.FindWindowW("Shell_TrayWnd", None)
                 if tray_hwnd:
-                    titles.append("taskbar_detected")  # flag taskbar presence for AI overlays
+                    # Get taskbar children for icon titles
+                    def tray_enum(hwnd, _):
+                        n = ctypes.windll.user32.GetWindowTextLengthW(hwnd) + 1
+                        buf = ctypes.create_unicode_buffer(n)
+                        ctypes.windll.user32.GetWindowTextW(hwnd, buf, n)
+                        t = buf.value.strip().lower()
+                        if t: titles.append(f"taskbar:{t}")
+                        return True
+                    ctypes.windll.user32.EnumChildWindows(tray_hwnd, ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(tray_enum), 0)
             except:
                 pass
             for t in titles:
@@ -251,7 +319,7 @@ def monitor_windows():
                 seen.add(t)
                 for kw in DANGEROUS_KEYWORDS:
                     if kw in t:
-                        post('DANGEROUS_WINDOW', {'title': t[:100], 'keyword': kw, 'minimized': 'taskbar' in t})
+                        post('DANGEROUS_WINDOW', {'title': t[:100], 'keyword': kw})
                         break
         except:
             pass
@@ -289,6 +357,26 @@ def monitor_mic():
         time.sleep(4)
     p.terminate()
 
+def monitor_multi_privileges():
+    while not TERMINATE.is_set():
+        # Multi-mic check
+        mic_users = []
+        for p in psutil.process_iter(['pid', 'name']):
+            name = p.info['name'].lower()
+            if any(kw in name for kw in ['zoom', 'teams', 'discord', 'obs', 'voicemeeter', 'audacity', 'claude', 'grok', 'chatgpt']):
+                mic_users.append(p.info['name'])
+        if len(mic_users) > 1:
+            post('MULTI_MIC_USE', {'processes': mic_users})
+        # Multi-screen sharing check
+        sharing_procs = []
+        for p in psutil.process_iter(['pid', 'name']):
+            name = p.info['name'].lower()
+            if any(kw in name for kw in ['zoom', 'teams', 'anydesk', 'teamviewer', 'obs', 'sharex', 'screen', 'remote']):
+                sharing_procs.append(p.info['name'])
+        if len(sharing_procs) > 1:
+            post('MULTI_SCREEN_SHARE', {'processes': sharing_procs})
+        time.sleep(10)
+
 def heartbeat():
     while not TERMINATE.is_set():
         try:
@@ -305,7 +393,7 @@ def send_report():
     if not events:
         return
     score = 0
-    summary = {'proc': set(), 'net': set(), 'win': set(), 'paste': 0, 'mic': 0, 'hidden': 0}
+    summary = {'proc': set(), 'net': set(), 'win': set(), 'paste': 0, 'mic': 0, 'hidden': 0, 'multi_mic': 0, 'multi_share': 0}
     for e in events:
         t = e['event']
         d = e['data']
@@ -315,6 +403,8 @@ def send_report():
         elif t == 'LARGE_PASTE': score += 15; summary['paste'] += 1
         elif t == 'DANGEROUS_MIC': score += 25; summary['mic'] += 1
         elif t == 'HIDDEN_AI_DETECTED': score += 40; summary['hidden'] += 1
+        elif t == 'MULTI_MIC_USE': score += 30; summary['multi_mic'] += 1
+        elif t == 'MULTI_SCREEN_SHARE': score += 30; summary['multi_share'] += 1
     score = min(score, 100)
     report = {
         'session_id': SESSION_ID,
@@ -348,6 +438,7 @@ def main():
         threading.Thread(target=monitor_windows, daemon=True).start()
         threading.Thread(target=monitor_hidden_ai, daemon=True).start()
         threading.Thread(target=monitor_mic, daemon=True).start()
+        threading.Thread(target=monitor_multi_privileges, daemon=True).start()
         threading.Thread(target=heartbeat, daemon=True).start()
         TERMINATE.wait()
     except:
