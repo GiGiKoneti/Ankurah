@@ -15,9 +15,9 @@ The core gesture detection engine was stabilized to handle real-world camera con
 - **Issue**: Subsequent alerts were failing to trigger because a "stale" timestamp (`last_step_time`) was not properly cleared after the first alert, leading to immediate timeouts on new sequences.
 - **Solution**: Updated the state machine's `_reset` logic to clear all transition timers. This allows for reliable, repetitive alert generation.
 
-### **Optimized Demo Experience**
-- **Increased Interactivity**: Reduced the alert `COOLDOWN` from 10.0s to **4.0s**.
-- **Snappier Transitions**: Reduced `HOLD_SECONDS` from 1.5s to **1.0s**, making the gesture recognition feel more responsive.
+### **Dynamic Multi-User Support**
+- **Simultaneous Tracking**: The detector now supports up to 4 hands simultaneously.
+- **Identity Persistence**: Implemented a spatial hand tracker that assigns independent `GestureStateMachine` instances to each hand based on their movement in the frame. This ensures that one person's movement doesn't interfere with another's alert sequence.
 
 ---
 
