@@ -13,7 +13,7 @@ class GestureStateMachine:
     
     HOLD_SECONDS           = 1.0   
     STEP_TIMEOUT           = 8.0   
-    COOLDOWN               = 10.0  
+    COOLDOWN               = 4.0  
     MIN_CONFIDENCE         = 0.70  
     RESET_GRACE            = 0.4   # seconds of "bad data" before we actually reset
 
@@ -240,6 +240,7 @@ class GestureStateMachine:
         self.state = "IDLE"
         self.step_start = None
         self._step_history = []
+        self.last_step_time = None
 
     def get_empty_debug(self):
         return {
