@@ -2,12 +2,13 @@ import cv2
 import time
 from camera_manager import CameraManager
 from gesture_detector import GestureStateMachine
-from alert_sender import send_alert
+from alert_sender import send_alert, send_live_snapshot
 
 def main():
     cam = CameraManager(source=0, fps=10)
     detectors = {} # Map of hand_id -> {detector, last_seen, last_pos}
     next_id = 0
+    last_live_send = 0
 
     print("[Ankurah Detector] Starting Multi-Hand Mode... Press Ctrl+C to stop.")
 
@@ -16,6 +17,12 @@ def main():
         if not ret: break
 
         now = time.time()
+        
+        # Periodic Live Heartbeat (every 1.5 seconds)
+        if now - last_live_send > 1.5:
+            send_live_snapshot(frame)
+            last_live_send = now
+
         hands_data = cam.get_landmarks(frame)
         
         current_frame_ids = []
@@ -46,7 +53,7 @@ def main():
                 d_id = next_id
                 next_id += 1
                 detectors[d_id] = {
-                    'detector': GestureStateMachine(on_alert=send_alert),
+                    'detector': GestureStateMachine(on_alert=lambda confidence: send_alert(confidence, frame)),
                     'pos': pos,
                     'last_seen': now,
                     'handedness': h_type

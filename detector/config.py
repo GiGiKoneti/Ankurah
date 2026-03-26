@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+BACKEND_URL = os.getenv("BACKEND_URL", "http://10.80.10.12:8000")
 CAMERA_ID = os.getenv("CAMERA_ID", "CAM-01")
 
 CAMERA_REGISTRY = {
