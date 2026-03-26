@@ -1,4 +1,5 @@
-# SafeSight — Master Project Documentation
+
+# Ankurah — Master Project Documentation
 ### Team: TLE_cursed | Hackathon: Build-Ora | Track: Agentic AI
 
 ---
@@ -23,7 +24,7 @@
 
 ## 1. Project Overview
 
-**SafeSight** converts existing public CCTV infrastructure into a proactive women's safety network.
+**Ankurah** converts existing public CCTV infrastructure into a proactive women's safety network.
 
 **The flow in one sentence:**
 > A victim performs the internationally-recognized Signal for Help gesture in front of any CCTV camera → AI detects it silently → Police control room dashboard lights up → Nearest officer gets SMS + Discord alert with exact GPS location → Officer dispatches immediately.
@@ -80,7 +81,7 @@ Officer phone (any team member's phone) is added to Discord server to receive al
 ## 3. Monorepo Structure
 
 ```
-safesight/                        ← root of the GitHub monorepo
+Ankurah/                        ← root of the GitHub monorepo
 │
 ├── README.md                     ← brief project description + how to run
 ├── .env.example                  ← template for all env variables (no secrets)
@@ -502,7 +503,7 @@ def main():
     cam = CameraManager(source=0, fps=10)
     detector = GestureStateMachine(on_alert=send_alert)
 
-    print("[SafeSight Detector] Starting... Press Q to quit.")
+    print("[Ankurah Detector] Starting... Press Q to quit.")
 
     frame_interval = 1.0 / 10  # 10 FPS
     last_frame_time = 0
@@ -525,7 +526,7 @@ def main():
         cv2.putText(frame, f"State: {state}", (10, 30),
                     cv2.FONT_HERSHEY_SIMPLEX, 1,
                     (0, 255, 0) if state == "IDLE" else (0, 0, 255), 2)
-        cv2.imshow("SafeSight — Detector", frame)
+        cv2.imshow("Ankurah — Detector", frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -801,7 +802,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import alert, stream, cameras, health, alerts
 
-app = FastAPI(title="SafeSight Backend")
+app = FastAPI(title="Ankurah Backend")
 
 app.add_middleware(
     CORSMiddleware,
@@ -1099,7 +1100,7 @@ export default function App() {
       <div style={{ background: '#111827', color: 'white', padding: '16px 24px',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
-          🛡️ SafeSight — Police Control Room
+          🛡️ Ankurah — Police Control Room
         </div>
         <div style={{ fontSize: '13px', color: connected ? '#10B981' : '#EF4444' }}>
           {connected ? '● Live' : '○ Reconnecting...'}
@@ -1138,8 +1139,8 @@ export default function App() {
 ### PWA manifest — public/manifest.json
 ```json
 {
-  "name": "SafeSight Police",
-  "short_name": "SafeSight",
+  "name": "Ankurah Police",
+  "short_name": "Ankurah",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",
@@ -1253,18 +1254,18 @@ ipconfig getifaddr en0
 # e.g. 192.168.1.10
 
 # Terminal 1 — backend
-cd safesight/backend
+cd Ankurah/backend
 source venv/bin/activate
 uvicorn main:app --host 0.0.0.0 --port 8000
 
 # Terminal 2 — detector
-cd safesight/detector
+cd Ankurah/detector
 source venv/bin/activate
 python main.py
 # Should open webcam window — you'll see "State: IDLE"
 
 # Terminal 3 — frontend
-cd safesight/frontend
+cd Ankurah/frontend
 npm run dev -- --host
 # Note the network URL: http://192.168.1.10:5173
 ```
@@ -1299,7 +1300,7 @@ All three should respond simultaneously — dashboard, Discord, phone.
 
 ### Demo script (90 seconds)
 
-> "Every 3 minutes, a woman in India faces violence. Most can't call for help — they're being watched. SafeSight solves this using cameras that already exist."
+> "Every 3 minutes, a woman in India faces violence. Most can't call for help — they're being watched. Ankurah solves this using cameras that already exist."
 
 [GiGi opens palm toward webcam — gesture state on Mac shows STEP1]
 
