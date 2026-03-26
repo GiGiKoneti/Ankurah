@@ -6,66 +6,79 @@ from alert_sender import send_alert
 
 def main():
     cam = CameraManager(source=0, fps=10)
-    detector = GestureStateMachine(on_alert=send_alert)
+    detectors = {} # Map of hand_id -> {detector, last_seen, last_pos}
+    next_id = 0
 
-    print("[Ankurah Detector] Starting... Press Ctrl+C to stop.")
-
-    frame_interval = 1.0 / 10  # 10 FPS
-    last_frame_time = 0
+    print("[Ankurah Detector] Starting Multi-Hand Mode... Press Ctrl+C to stop.")
 
     while True:
         ret, frame = cam.cap.read()
-        if not ret:
-            print("[ERROR] Cannot read from camera")
-            break
+        if not ret: break
 
         now = time.time()
-        if now - last_frame_time < frame_interval:
-            continue
-        last_frame_time = now
-
-        landmarks, handedness = cam.get_landmarks(frame)
+        hands_data = cam.get_landmarks(frame)
         
-        if landmarks:
-            state, debug = detector.update(landmarks, handedness=handedness)
-        else:
-            state = detector.state
-            debug = detector.get_empty_debug()
-
-        frame = cam.draw_landmarks(frame, landmarks)
+        current_frame_ids = []
         
-        # State display
-        color = (0, 255, 0) if state == "IDLE" else (0, 0, 255)
-        cv2.putText(frame, f"State: {state}", (10, 40),
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, color, 3)
+        for hand in hands_data:
+            lm = hand['landmarks']
+            h_type = hand['handedness']
+            # Use wrist (landmark 0) for tracking
+            pos = (lm.landmark[0].x, lm.landmark[0].y)
+            
+            # 1. Match to existing detector
+            best_match_id = None
+            min_dist = 0.15 # Max distance to consider a match
+            
+            for d_id, d_info in detectors.items():
+                if d_info['handedness'] == h_type:
+                    dist = ((pos[0] - d_info['pos'][0])**2 + (pos[1] - d_info['pos'][1])**2)**0.5
+                    if dist < min_dist:
+                        min_dist = dist
+                        best_match_id = d_id
+            
+            # 2. Update or Create
+            if best_match_id is not None:
+                d_id = best_match_id
+                detectors[d_id]['pos'] = pos
+                detectors[d_id]['last_seen'] = now
+            else:
+                d_id = next_id
+                next_id += 1
+                detectors[d_id] = {
+                    'detector': GestureStateMachine(on_alert=send_alert),
+                    'pos': pos,
+                    'last_seen': now,
+                    'handedness': h_type
+                }
+            
+            current_frame_ids.append(d_id)
+            state, debug = detectors[d_id]['detector'].update(lm, handedness=h_type)
+            
+            # 3. UI Overlay for this hand
+            cam.draw_landmarks(frame, lm)
+            
+            # Draw status text near the hand
+            h, w, _ = frame.shape
+            px, py = int(pos[0] * w), int(pos[1] * h)
+            color = (0, 255, 0) if state == "IDLE" else (0, 0, 255)
+            cv2.putText(frame, f"ID:{d_id} {state}", (px, py - 20),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+            
+            if debug['palm_open']:
+                cv2.circle(frame, (px, py - 45), 5, (0, 255, 0), -1)
 
-        # Debug Overlay
-        y0, dy = 80, 25
-        
-        p_color = (0,255,0) if debug['palm_open'] else (0,0,255)
-        cv2.putText(frame, f"PALM OPEN: {debug['palm_open']}", (10, y0),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, p_color, 2)
-        
-        t_color = (0,255,0) if debug['thumb_tucked'] else (0,0,255)
-        cv2.putText(frame, f"THUMB TUCKED: {debug['thumb_tucked']}", (10, y0 + dy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, t_color, 2)
-        cv2.putText(frame, f"  > IP Angle: {debug['thumb_ip_angle']:.1f}", (10, y0 + 2*dy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-        cv2.putText(frame, f"  > Plane Dist: {debug['thumb_signed_dist']:.3f}", (10, y0 + 3*dy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-        cv2.putText(frame, f"  > Lateral T: {debug['thumb_lateral_t']:.3f}", (10, y0 + 4*dy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        # 4. Cleanup old detectors (stale > 2s)
+        to_delete = [d_id for d_id, info in detectors.items() if now - info['last_seen'] > 2.0]
+        for d_id in to_delete:
+            del detectors[d_id]
 
-        f_color = (0,255,0) if debug['fist_closed'] else (0,0,255)
-        cv2.putText(frame, f"FIST CLOSED: {debug['fist_closed']}", (10, y0 + 6*dy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, f_color, 2)
-        cv2.putText(frame, f"  > Curled: {debug['fist_curled_count']}/4", (10, y0 + 7*dy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
-        cv2.putText(frame, f"  > Depth: {debug['fist_depth_count']}/2", (10, y0 + 8*dy),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+        # Global Status
+        cv2.putText(frame, f"Active Hands: {len(detectors)}", (10, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-        cv2.imshow("Ankurah — Detector", frame)
-        cv2.waitKey(1)
+        cv2.imshow("Ankurah — Multi-Hand Detector", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'): break
 
     cam.release()
 

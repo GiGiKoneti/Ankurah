@@ -8,7 +8,7 @@ class CameraManager:
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
             static_image_mode=False,
-            max_num_hands=1,
+            max_num_hands=4,
             min_detection_confidence=0.7,
             min_tracking_confidence=0.5
         )
@@ -17,12 +17,15 @@ class CameraManager:
     def get_landmarks(self, frame):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         result = self.hands.process(rgb)
+        
+        hands_data = []
         if result.multi_hand_landmarks:
-            landmarks = result.multi_hand_landmarks[0]
-            # Extract handedness (label is 'Left' or 'Right')
-            handedness = result.multi_handedness[0].classification[0].label
-            return landmarks, handedness
-        return None, None
+            for landmarks, handedness in zip(result.multi_hand_landmarks, result.multi_handedness):
+                hands_data.append({
+                    "landmarks": landmarks,
+                    "handedness": handedness.classification[0].label
+                })
+        return hands_data
 
     def draw_landmarks(self, frame, landmarks):
         if landmarks:
