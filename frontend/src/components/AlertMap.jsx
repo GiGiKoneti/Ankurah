@@ -1,4 +1,5 @@
-import { GoogleMap, useJsApiLoader, MarkerF } from '@react-google-maps/api'
+import { useEffect, useRef } from 'react'
+import { GoogleMap, useJsApiLoader, MarkerF, OverlayView } from '@react-google-maps/api'
 import { CAMERAS } from '../constants/cameras'
 
 const GMAPS_KEY = import.meta.env.VITE_GMAPS_KEY
@@ -71,9 +72,23 @@ const mapOptions = {
 }
 
 export default function AlertMap({ latestAlert }) {
+  const mapRef = useRef(null)
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: GMAPS_KEY,
   })
+
+  // Auto-zoom/pan logic when alert changes
+  useEffect(() => {
+    if (isLoaded && mapRef.current) {
+      if (latestAlert) {
+        mapRef.current.panTo({ lat: latestAlert.lat, lng: latestAlert.lng })
+        mapRef.current.setZoom(16)
+      } else {
+        mapRef.current.panTo(BENGALURU_CENTER)
+        mapRef.current.setZoom(13)
+      }
+    }
+  }, [latestAlert, isLoaded])
 
   if (!isLoaded) {
     return (
@@ -87,12 +102,13 @@ export default function AlertMap({ latestAlert }) {
   }
 
   return (
-    <div className="map-container relative" style={{ minHeight: '400px' }}>
+    <div className="map-container relative font-sans" style={{ minHeight: '400px' }}>
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         center={BENGALURU_CENTER}
         zoom={13}
         options={mapOptions}
+        onLoad={(map) => (mapRef.current = map)}
       >
         {/* Static camera markers — grey/teal */}
         {CAMERAS.map((cam) => (
@@ -107,18 +123,30 @@ export default function AlertMap({ latestAlert }) {
           />
         ))}
 
-        {/* Alert marker — RED */}
+        {/* Alert marker — RED + Radar Rings */}
         {latestAlert && (
-          <MarkerF
-            position={{ lat: latestAlert.lat, lng: latestAlert.lng }}
-            title={`🚨 ALERT — ${latestAlert.location_name} — ${latestAlert.camera_id}`}
-            icon={{
-              url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
-              scaledSize: { width: 44, height: 44 },
-            }}
-            animation={2} // BOUNCE
-            zIndex={1000}
-          />
+          <>
+            <MarkerF
+              position={{ lat: latestAlert.lat, lng: latestAlert.lng }}
+              title={`🚨 ALERT — ${latestAlert.location_name} — ${latestAlert.camera_id}`}
+              icon={{
+                url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
+                scaledSize: { width: 44, height: 44 },
+              }}
+              animation={2} // BOUNCE
+              zIndex={1000}
+            />
+            <OverlayView
+              position={{ lat: latestAlert.lat, lng: latestAlert.lng }}
+              mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+            >
+              <div className="radar-container">
+                <div className="radar-ring" />
+                <div className="radar-ring" />
+                <div className="radar-ring" />
+              </div>
+            </OverlayView>
+          </>
         )}
       </GoogleMap>
 
@@ -139,3 +167,4 @@ export default function AlertMap({ latestAlert }) {
     </div>
   )
 }
+

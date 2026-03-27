@@ -55,7 +55,7 @@ export default function Dashboard() {
             </div>
             <div>
               <h1 className="text-base md:text-lg font-black tracking-tight text-white leading-none">
-                SafeSight
+                Ankurah
               </h1>
               <p className="text-[10px] md:text-[11px] text-ops-muted font-medium tracking-wider uppercase">
                 Police Control Room
@@ -166,7 +166,7 @@ export default function Dashboard() {
       {/* ── Footer ── */}
       <footer className="border-t border-ops-border mt-6">
         <div className="max-w-[1600px] mx-auto px-4 md:px-6 py-3 flex items-center justify-between text-[10px] text-ops-muted">
-          <span>SafeSight v1.0 — Ankurah Project</span>
+          <span>Ankurah v1.0 — Ankurah Project</span>
           <span className="font-mono">
             {isConnected ? `SSE ↔ ${BACKEND_URL}` : 'Backend unreachable'}
           </span>

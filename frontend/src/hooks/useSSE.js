@@ -76,7 +76,7 @@ export function useSSE() {
   //     }
   //     setLatestAlert(mockAlert)
   //     setAlerts(prev => [mockAlert, ...prev].slice(0, 50))
-  //   }, 10000)
+  //   }, 5000) // Trigger every 5 seconds for faster testing
   //   return () => clearInterval(interval)
   // }, [])
 
